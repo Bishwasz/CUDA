@@ -1,8 +1,12 @@
-#include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cuda_runtime.h>
 
+#define TILE_WIDTH 16
+#define Mask_width 5
+#define Mask_radius (Mask_width / 2)
+#define w (TILE_WIDTH + Mask_width - 1)
 __global__ void convolution_tiled(float *I, const float *M, float *P, int channels, int width, int height) {
 
 	  __shared__ float N_ds[w][w];
@@ -57,3 +61,46 @@ __global__ void convolution_tiled(float *I, const float *M, float *P, int channe
         __syncthreads();
     }
   }
+__constant__ float devMask[Mask_width * Mask_width];
+
+int main() {
+    // Input dimensions
+    int channels = 3, width = 1024, height = 1024;
+
+    // Allocate host memory
+    float *h_I = (float *)malloc(width * height * channels * sizeof(float));
+    float *h_M = (float *)malloc(Mask_width * Mask_width * sizeof(float));
+    float *h_P = (float *)malloc(width * height * channels * sizeof(float));
+
+    // Initialize data
+    // (Fill h_I and h_M with values)
+
+    // Allocate device memory
+    float *d_I, *d_P;
+    cudaMalloc((void **)&d_I, width * height * channels * sizeof(float));
+    cudaMalloc((void **)&d_P, width * height * channels * sizeof(float));
+
+    // Copy data to device
+    cudaMemcpy(d_I, h_I, width * height * channels * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(devMask, h_M, Mask_width * Mask_width * sizeof(float));
+
+    // Kernel launch configuration
+    dim3 dimBlock(TILE_WIDTH, TILE_WIDTH, 1);
+    dim3 dimGrid((width + TILE_WIDTH - 1) / TILE_WIDTH, (height + TILE_WIDTH - 1) / TILE_WIDTH, 1);
+
+    // Launch kernel
+    convolution_tiled<<<dimGrid, dimBlock>>>(d_I, devMask, d_P, channels, width, height);
+
+    // Copy result back to host
+    cudaMemcpy(h_P, d_P, width * height * channels * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Clean up
+    free(h_I);
+    free(h_M);
+    free(h_P);
+    cudaFree(d_I);
+    cudaFree(d_P);
+
+    return 0;
+}
+
