@@ -7,47 +7,43 @@ __global__ void sgemm_shared_mem_block(int M, int N, int K,
                                        const float *B, 
                                        float beta, 
                                        float *C) {
-    // Shared memory for caching tiles of A and B
     __shared__ float As[BLOCKSIZE * BLOCKSIZE];
     __shared__ float Bs[BLOCKSIZE * BLOCKSIZE];
     
-    // Advance pointers to the starting positions for this block
-    A += blockIdx.y * BLOCKSIZE * K;                    // row=blockIdx.y, col=0
-    B += blockIdx.x * BLOCKSIZE;                        // row=0, col=blockIdx.x
-    C += blockIdx.y * BLOCKSIZE * N + blockIdx.x * BLOCKSIZE; // row=blockIdx.y, col=blockIdx.x
+    // Global row and column for this thread
+    int globalRow = blockIdx.y * BLOCKSIZE + threadIdx.y;
+    int globalCol = blockIdx.x * BLOCKSIZE + threadIdx.x;
     
     float tmp = 0.0;
     
-    // Outer loop: advance A along columns and B along rows
     // Process K dimension in chunks of BLOCKSIZE
     for (int bkIdx = 0; bkIdx < K; bkIdx += BLOCKSIZE) {
-        // Load one element of A and B into shared memory
-        // Each thread loads one element from A and one from B
-        // threadIdx.x is consecutive for memory coalescing
-        As[threadIdx.y * BLOCKSIZE + threadIdx.x] = A[threadIdx.y * K + threadIdx.x];
-        Bs[threadIdx.y * BLOCKSIZE + threadIdx.x] = B[threadIdx.y * N + threadIdx.x];
+        // Load tile from A with bounds checking
+        int aRow = globalRow;
+        int aCol = bkIdx + threadIdx.x;
+        As[threadIdx.y * BLOCKSIZE + threadIdx.x] = 
+            (aRow < M && aCol < K) ? A[aRow * K + aCol] : 0.0f;
         
-        // Synchronize to ensure all threads have loaded their data
-        // before any thread starts computing
+        // Load tile from B with bounds checking
+        int bRow = bkIdx + threadIdx.y;
+        int bCol = globalCol;
+        Bs[threadIdx.y * BLOCKSIZE + threadIdx.x] = 
+            (bRow < K && bCol < N) ? B[bRow * N + bCol] : 0.0f;
+        
         __syncthreads();
         
-        // Advance pointers to next chunk
-        A += BLOCKSIZE;
-        B += BLOCKSIZE * N;
-        
         // Compute dot product on the cached block
-        // Each thread computes one element of the C tile
         for (int dotIdx = 0; dotIdx < BLOCKSIZE; ++dotIdx) {
             tmp += As[threadIdx.y * BLOCKSIZE + dotIdx] *
                    Bs[dotIdx * BLOCKSIZE + threadIdx.x];
         }
         
-        // Synchronize again to ensure all threads finish computing
-        // before the next iteration loads new data into shared memory
         __syncthreads();
     }
     
-    // Write final result to global memory
-    C[threadIdx.y * N + threadIdx.x] = 
-        alpha * tmp + beta * C[threadIdx.y * N + threadIdx.x];
+    // Write result with bounds checking
+    if (globalRow < M && globalCol < N) {
+        C[globalRow * N + globalCol] = 
+            alpha * tmp + beta * C[globalRow * N + globalCol];
+    }
 }
