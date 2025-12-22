@@ -8,3 +8,9 @@ __global__ void sgemm_naive(int M, int N, int K,
                             const float *B, float beta, float *C);
 __global__ void sgemm_coalescing(int M, int N, int K, float alpha, const float *A,
                                   const float *B, float beta, float *C);
+__global__ void sgemm_shared_mem_block(int M, int N, int K, 
+                                       float alpha, 
+                                       const float *A, 
+                                       const float *B, 
+                                       float beta, 
+                                       float *C) ;

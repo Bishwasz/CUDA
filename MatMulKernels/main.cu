@@ -84,16 +84,17 @@ int main() {
     cudaMemcpy(d_C, h_C.data(), sizeC, cudaMemcpyHostToDevice);
 
     // ---------------- Launch config ----------------
-    // dim3 blockDim(32, 32);
-    dim3 blockDim(32*32);
-    dim3 gridDim(CEIL_DIV(M, 32), CEIL_DIV(N, 32));
+     dim3 blockDim(32, 32);
+    //dim3 blockDim(32*32);
+    dim3 gridDim(CEIL_DIV(N, 32), CEIL_DIV(M, 32));
 
     std::cout << "Matrix sizes: "
               << M << " x " << N << " x " << K << "\n\n";
 
     // ---------------- Time kernels ----------------
-    // time_kernel("SGEMM Naive",sgemm_naive,gridDim, blockDim,M, N, K, alpha, d_A, d_B, beta, d_C);
-    time_kernel("SGEMM Coalescing", sgemm_coalescing, gridDim, blockDim, M, N, K, alpha, d_A, d_B, beta, d_C);
+    time_kernel("Sgemm Shared Memory",  sgemm_shared_mem_block,gridDim,  blockDim,M, N, K, alpha, d_A, d_B, beta, d_C); 
+// time_kernel("SGEMM Naive",sgemm_naive,gridDim, blockDim,M, N, K, alpha, d_A, d_B, beta, d_C);
+   // time_kernel("SGEMM Coalescing", sgemm_coalescing, gridDim, blockDim, M, N, K, alpha, d_A, d_B, beta, d_C);
     cudaFree(d_A);
     cudaFree(d_B);
     cudaFree(d_C);
