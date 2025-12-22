@@ -1,6 +1,6 @@
 NVCC=nvcc
 CFLAGS=-O3
-SRC=main.cu sgemm1.cu sgemm_coalescing.cu sgemm_smem.cu
+SRC=main.cu sgemm_kernelSimp.cu sgemm1.cu sgemm_coalescing.cu sgemm_smem.cu
 OUT=sgemm
 
 all: $(OUT)
